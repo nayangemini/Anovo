@@ -1,0 +1,42 @@
+workflows:
+  ios-old-code-ipa:
+    name: iOS old-code .ipa (artifacts only, no publish)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_ids:
+          - com.soniqinfotech.anovo
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install frontend dependencies
+        working_directory: frontend
+        script: |
+          npm ci --no-audit --no-fund
+      - name: Static export and Capacitor sync
+        working_directory: frontend
+        script: |
+          npm run mobile:sync
+      - name: Bump build number (Apple rejects reused numbers)
+        working_directory: frontend/ios/App
+        script: |
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Install CocoaPods dependencies
+        working_directory: frontend/ios/App
+        script: |
+          pod install
+      - name: Build signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace frontend/ios/App/App.xcworkspace \
+            --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+    # For release runs, add an App Store Connect publishing block here
+    # (or enable it in the Codemagic UI) to auto-upload to TestFlight:
+    # publishing:
+    #   app_store_connect:
+    #     auth: integration
+    #     submit_to_testflight: true
